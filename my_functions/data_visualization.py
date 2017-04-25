@@ -5,6 +5,7 @@ Some plot functions that can be used to analyze the data.
 import pandas as pd
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
+from my_functions import my_errors
 
 
 def plot_elec(df):
@@ -24,7 +25,6 @@ def plot_elec(df):
     plt.xlabel('Hour of day')
     plt.plot(df.kwh.groupby(df.index.hour).mean(), label='Avg')
     plt.legend()
-    return fig
 
 
 def compare_weekday_weekend(elec_and_weather):
@@ -52,7 +52,6 @@ def compare_weekday_weekend(elec_and_weather):
     plt.xlabel('Hour of Day')
     plt.ylabel('Electricity Usage (kWh)')
     plt.legend(['Weekend', 'Weekday'], loc='upper left')
-    return fig
 
 
 def compare_elec_temp(elec_and_weather):
@@ -80,7 +79,6 @@ def compare_elec_temp(elec_and_weather):
     plt.ylabel('Electricity Usage (kwh)')
     plt.title('Electricity Usage (kwh) vs. Outdoor Temperature ($^\circ$C)')
     plt.legend(handles=[p1])
-    return fig
 
 
 def p(ax, col, dropped):
@@ -122,7 +120,8 @@ def compare_t_t_k(elec_and_weather):
     f.set_figwidth(15)
     f.text(0.07, 0.5, 'Elec. Usage at $t$ hour',
            va='center', rotation='vertical', fontsize=14)
-    f.text(0.5, 0.9, 'Elec. Usage at $t$ hour vs. Elec. Usage at $t-k$ hour\nUnit: kwh', ha='center', fontsize=14, fontweight='bold')
+    f.text(0.5, 0.9, 'Elec. Usage at $t$ hour vs. Elec. Usage at $t-k$ hour\nUnit: kwh',
+           ha='center', fontsize=14, fontweight='bold')
 
     p(ax[0, 0], 'kwh_t-1', dropped)
     p(ax[0, 1], 'kwh_t-2', dropped)
@@ -140,4 +139,21 @@ def compare_t_t_k(elec_and_weather):
     plt.setp([a.get_yticklabels() for a in ax[:, 2]], visible=False)
     plt.subplots_adjust(wspace=0.1, hspace=0.1)
 
-    return f
+
+def plot_pred(X_test, y_test, pred):
+    """
+    Plot prediction result. The X axis uses the index of X_test.
+    Make sure X_test has index.
+
+    Args:
+        model: sklearn model.
+        X_test: test set input. If this is a scaled array, it may not contain index.
+        y_test: test set out.
+        pred: pred = model.predict(X_test_scaled)
+    """
+    fig = plt.figure(figsize=(16, 9))
+    plt.plot(X_test.index, pred, linestyle='-.', lw=4, label='prediction')
+    plt.plot(X_test.index, y_test, lw=3, label='observations')
+    plt.ylabel('Electricity Usage (kwh)')
+    plt.legend(fontsize=14)
+    print(my_errors.errors(y_test, pred))

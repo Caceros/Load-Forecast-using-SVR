@@ -3,18 +3,7 @@ Fuctions that process data for SVR input and run SVR model.
 """
 
 import pandas as pd
-import statsmodels.api as sm
-
-
-# def drop_col(elec_and_weather, keep_columns=['kwh', 'tempm']):
-#     """
-#     Directly drop some columns of the elec_and_weather DataFrame.
-
-#     Args:
-#         elec_and_weather DataFrame, columns to keep.
-#     """
-#     elec_and_weather.drop(elec_and_weather.columns.drop(keep_columns),
-#                           axis=1, inplace=True)
+import numpy as np
 
 
 def add_if_holiday(elec_and_weather, workdays=[], holidays=[]):
@@ -66,4 +55,27 @@ def add_historical_kwh(elec_and_weather):
     elec_and_weather['kwh_t-12'] = elec_and_weather['kwh'].shift(12)
     elec_and_weather['kwh_t-24'] = elec_and_weather['kwh'].shift(24)
     elec_and_weather['kwh_t-48'] = elec_and_weather['kwh'].shift(48)
+
+
+def split(elec_and_weather, time_str, drop_col=[]):
+    """
+    Split the data into training set and test set.
+
+    Args:
+        elec_and_weather: DataFrame.
+        time_str: list [train_start, train_end, test_start, test_end]
+                  example: ['2/15/2017', '3/23/2017', '3/24/2017', '3/31/2017']
+        drop_col: unnecessary columns like ['kwh_t-2', 'kwh_t-3', 'kwh_t-4']
+    Returns:
+        X_train, y_train, X_test, y_test
+    """
+    train_start, train_end, test_start, test_end = time_str
+
+    big_set = elec_and_weather.dropna().drop(drop_col, axis=1)
+    X_train = big_set.drop('kwh', axis=1)[train_start:train_end]
+    y_train = np.array(big_set.loc[train_start:train_end, 'kwh'])
+    X_test = big_set.drop('kwh', axis=1)[test_start:test_end]
+    y_test = np.array(big_set.loc[test_start:test_end, 'kwh'])
+
+    return X_train, y_train, X_test, y_test
 

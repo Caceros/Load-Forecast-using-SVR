@@ -8,23 +8,32 @@ import statsmodels.api as sm
 from my_functions import my_errors
 
 
-def plot_elec(df):
+def plot_elec_hourly(df):
     """
-    Visualize elec data by hour of day.
+    Visualize elec data by hour of day.l
 
     Args:
         Elec DataFrame.
-
-    Returns:
-        fig.
     """
-    fig = plt.figure(figsize=(16, 9))
-    plt.plot(df.index.hour, df.kwh, 'x', color='grey', label='data point')
+    fig = plt.figure(figsize=(12, 7))
+    plt.plot(df.index.hour, df.kwh, '.', color='grey', label='data point')
     plt.xticks(range(24), range(24))
     plt.ylabel('Electricity Usage (kwh)')
     plt.xlabel('Hour of day')
     plt.plot(df.kwh.groupby(df.index.hour).mean(), label='Avg')
     plt.legend()
+
+
+def plot_elec_daily(df):
+    """
+    Visualize daily elec data.
+
+    Args:
+        Elec DataFrame.
+    """
+    fig = plt.figure(figsize=(12, 7))
+    plt.plot(df['kwh'].resample('D').sum(), marker='.', markersize=7)
+    plt.ylabel('Electricity Usage (kwh)')
 
 
 def compare_weekday_weekend(elec_and_weather):
@@ -45,40 +54,66 @@ def compare_weekday_weekend(elec_and_weather):
     # and outdoor temp)
     AvgDay = pd.DataFrame([WkdayWkend_Hour['kwh'].mean(),
                            WkdayWkend_Hour['tempm'].mean()])
-    fig = plt.figure()
+    fig = plt.figure(figsize=(8, 5))
     AvgDay[True].ix['kwh'].plot(marker='x', color='b')
     AvgDay[False].ix['kwh'].plot(marker='.', color='g')
     plt.xlim(0, 23)
     plt.xlabel('Hour of Day')
     plt.ylabel('Electricity Usage (kWh)')
     plt.legend(['Weekend', 'Weekday'], loc='upper left')
+    plt.title('Average Electricity Usage On Weekdays And Weekends')
 
 
-def compare_elec_temp(elec_and_weather):
+def compare_elec_temp(elec_and_weather, if_ols=False):
     """
     Use linear regression to find the relationship between elec usage and temperature.
-    It's not accurate, this visualization might tell you something.
+    It's not accurate, but this visualization might tell you something.
 
     Args:
         DataFrame that has both elec and weather data.
+        if_ols: wether to do an ordinary least regression.
 
     Returns:
         print out fit result and fig.
     """
-    model = sm.OLS(elec_and_weather['kwh'],
-                   sm.add_constant(elec_and_weather['tempm']))
-    res = model.fit()
-    print(res.summary())
 
     fig = plt.figure(figsize=(10, 10))
     plt.scatter(elec_and_weather['tempm'], elec_and_weather['kwh'],
                 marker='x', color='g')
-    p1, = plt.plot(elec_and_weather['tempm'], res.fittedvalues, color='blue',
-                   label='OLS $R^2$=%.3f' % res.rsquared)
-    plt.xlabel('Outdoor Temperature (C)')
+    plt.xlabel('Outdoor Temperature ($^\circ$C)')
     plt.ylabel('Electricity Usage (kwh)')
     plt.title('Electricity Usage (kwh) vs. Outdoor Temperature ($^\circ$C)')
-    plt.legend(handles=[p1])
+
+    if if_ols:
+        model = sm.OLS(elec_and_weather['kwh'],
+                       sm.add_constant(elec_and_weather['tempm']))
+        res = model.fit()
+        print(res.summary())
+        p1, = plt.plot(elec_and_weather['tempm'], res.fittedvalues, color='blue',
+                       label='OLS $R^2$=%.3f' % res.rsquared)
+        plt.legend(handles=[p1])
+
+
+def compare_elec_hum(elec_and_weather, if_ols=False):
+    """
+    Similar to compare_elec_temp, but compare with humidity.
+    """
+
+    fig = plt.figure(figsize=(10, 10))
+    plt.scatter(elec_and_weather['hum'], elec_and_weather['kwh'],
+                marker='x', color='g')
+    plt.xlabel('Relative Humidity (%)')
+    plt.ylabel('Electricity Usage (kwh)')
+    plt.title('Electricity Usage (kwh) vs. Relative Humidity (%)')
+
+    if if_ols:
+        model = sm.OLS(elec_and_weather['kwh'],
+                       sm.add_constant(elec_and_weather['hum']))
+        res = model.fit()
+        print(res.summary())
+        p1, = plt.plot(elec_and_weather['hum'], res.fittedvalues, color='blue',
+                       label='OLS $R^2$=%.3f' % res.rsquared)
+        plt.legend(handles=[p1])
 
 
 def p(ax, col, dropped):
@@ -120,7 +155,7 @@ def compare_t_t_k(elec_and_weather):
     f.set_figwidth(15)
     f.text(0.07, 0.5, 'Elec. Usage at $t$ hour',
            va='center', rotation='vertical', fontsize=14)
-    f.text(0.5, 0.9, 'Elec. Usage at $t$ hour vs. Elec. Usage at $t-k$ hour\nUnit: kwh',
+    f.text(0.5, 0.9, 'Elec. Usage at $t$ vs. Elec. Usage at $t-k$\nUnit: kwh',
            ha='center', fontsize=14, fontweight='bold')
 
     p(ax[0, 0], 'kwh_t-1', dropped)
@@ -140,20 +175,17 @@ def compare_t_t_k(elec_and_weather):
     plt.subplots_adjust(wspace=0.1, hspace=0.1)
 
 
-def plot_pred(X_test, y_test, pred):
+def plot_pred(y_test, pred):
     """
-    Plot prediction result. The X axis uses the index of X_test.
-    Make sure X_test has index.
+    Plot prediction result.
 
     Args:
-        model: sklearn model.
-        X_test: test set input. If this is a scaled array, it may not contain index.
-        y_test: test set out.
-        pred: pred = model.predict(X_test_scaled)
+        y_test: test set target values, the actual values.
+        pred: prediction made by model
     """
     fig = plt.figure(figsize=(16, 9))
-    plt.plot(X_test.index, pred, linestyle='-.', lw=4, label='prediction')
-    plt.plot(X_test.index, y_test, lw=3, label='observations')
+    plt.plot(y_test.index, pred, linestyle='-.', lw=4, label='prediction')
+    plt.plot(y_test.index, y_test, lw=3, label='observations')
     plt.ylabel('Electricity Usage (kwh)')
     plt.legend(fontsize=14)
     print(my_errors.errors(y_test, pred))

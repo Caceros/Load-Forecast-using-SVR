@@ -5,7 +5,6 @@ pred: predctions.
 
 RMSE and MAE are usually used to compare models trained with same data.
 
-@Caceros Thu Apr 20 22:39:17 2017
 """
 import numpy as np
 

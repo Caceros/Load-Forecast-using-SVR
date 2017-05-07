@@ -29,8 +29,8 @@ import time
 
 key = '0f63b2474e401b5d'
 
-# zmw = '00000.1.59493'  # Shezhen, China 深圳
-zmw = '00000.1.59082'  # Shaoguan, China 韶关
+zmw = '00000.1.59493'  # Shenzhen, China 深圳
+# zmw = '00000.1.59082'  # Shaoguan, China 韶关
 # this dict structure will be reused a few times
 empty_obs_dict = {'tempm': [], 'hum': [],
                   'wspdm': [], 'precipm': [], 'conds': []}

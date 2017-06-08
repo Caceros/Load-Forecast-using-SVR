@@ -17,7 +17,6 @@ def plot_elec_hourly(df):
     """
     fig = plt.figure(figsize=(12, 7))
     plt.plot(df.index.hour, df.kwh, '.', color='grey', label='data point')
-    plt.xticks(range(24), range(24))
     plt.ylabel('Electricity Usage (kwh)')
     plt.xlabel('Hour of day')
     plt.plot(df.kwh.groupby(df.index.hour).mean(), label='Avg')
@@ -135,7 +134,7 @@ def p(ax, col, dropped):
     # line
     h, = ax.plot([min(dropped[col]), max(dropped[col])],
                  [min(res.fittedvalues), max(res.fittedvalues)])
-    ax.set_xlabel('Elec. Usage at $%s$ hour' % col[4:])
+    ax.set_xlabel('Elec. Usage at $%s$' % col[4:])
     ax.legend([h], ['OLS $R^2$=%.2f' % res.rsquared], loc='lower right')
 
 
@@ -173,6 +172,34 @@ def compare_t_t_k(elec_and_weather):
     plt.setp([a.get_yticklabels() for a in ax[:, 1]], visible=False)
     plt.setp([a.get_yticklabels() for a in ax[:, 2]], visible=False)
     plt.subplots_adjust(wspace=0.1, hspace=0.1)
+
+
+def plot_multiscale_result(result_15min, y_test_15min, result_30min, y_test_30min, result_1h,
+                           y_test_1h, result_2h, y_test_2h):
+    """
+    Plot different time scale prediction result in one plot.
+    """
+    f, ax = plt.subplots(4, sharex=True, figsize=(16, 12))
+    l1 = ax[0].plot(y_test_15min.index, result_15min, linestyle='-.', lw=4)
+    l2 = ax[0].plot(y_test_15min.index, y_test_15min, lw=3)
+    ax[0].set_title('15 min')
+    ax[0].legend((l1[0], l2[0]), ('Pred', 'Obs'),
+                 loc='upper left', fontsize=14)
+
+    ax[1].plot(result_1h, linestyle='-.', lw=4)
+    ax[1].plot(y_test_1h, lw=3)
+    ax[1].set_title('30 min')
+
+    ax[2].plot(result_1h, linestyle='-.', lw=4)
+    ax[2].plot(y_test_1h, lw=3)
+    ax[2].set_title('1  hour')
+
+    ax[3].plot(result_2h, linestyle='-.', lw=4)
+    ax[3].plot(y_test_2h, lw=3)
+    ax[3].set_title('2  hours')
+
+    f.text(0.07, 0.5, 'Elec. Usage (kwh)', va='center',
+           rotation='vertical', fontsize=14)
 
 
 def plot_pred(y_test, pred):

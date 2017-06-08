@@ -1,9 +1,10 @@
 """
-Functions that process data for SVR input.
+Functions that process data for SVR input, do the SVR modeling and predicting.
 """
 
 import pandas as pd
 import numpy as np
+import copy
 from my_functions import my_errors
 from sklearn import svm
 
@@ -22,7 +23,7 @@ def add_if_holiday(df, workdays=[], holidays=[]):
         holidays: dates to be modified to 1
     """
     df['if_holiday'] = 0
-    df.loc[df.index.dayofweek >= 5, 'if_holiday'] = 1
+    df.ix[df.index.dayofweek >= 5, 'if_holiday'] = 1
 
     if workdays:
         for day in workdays:
@@ -32,44 +33,44 @@ def add_if_holiday(df, workdays=[], holidays=[]):
             df.loc[day, 'if_holiday'] = 1
 
 
-def delete_if_holiday(elec_and_weather):
+def delete_if_holiday(df):
     """
     Delete if_holiday features.
     """
-    elec_and_weather.drop('if_holiday', axis=1, inplace=True)
+    df.drop('if_holiday', axis=1, inplace=True)
 
 
-def add_hour_of_day(elec_and_weather):
+def add_hour_of_day(df):
     """
     Add feature column `hour of day`: 0 ~ 23
     """
     for i in range(24):
-        elec_and_weather[i] = 0
-        elec_and_weather.loc[elec_and_weather.index.hour == i, i] = 1
+        df[i] = 0
+        df.ix[df.index.hour == i, i] = 1
 
 
-def delete_hour_of_day(elec_and_weather):
+def delete_hour_of_day(df):
     """
     Delete hour_of_day features.
     """
-    elec_and_weather.drop(range(24), axis=1, inplace=True)
+    df.drop(range(24), axis=1, inplace=True)
 
 
-def add_historical_kwh(elec_and_weather):
+def add_historical_kwh(df):
     """
     Add t-1, t-2, t-3, t-4, t-5,
     t-6, t-12, t-24, t-48 historical elec usage columns.
     Some columns will have NA values.
     """
-    elec_and_weather['kwh_t-1'] = elec_and_weather['kwh'].shift(1)
-    elec_and_weather['kwh_t-2'] = elec_and_weather['kwh'].shift(2)
-    elec_and_weather['kwh_t-3'] = elec_and_weather['kwh'].shift(3)
-    elec_and_weather['kwh_t-4'] = elec_and_weather['kwh'].shift(4)
-    elec_and_weather['kwh_t-5'] = elec_and_weather['kwh'].shift(5)
-    elec_and_weather['kwh_t-6'] = elec_and_weather['kwh'].shift(6)
-    elec_and_weather['kwh_t-12'] = elec_and_weather['kwh'].shift(12)
-    elec_and_weather['kwh_t-24'] = elec_and_weather['kwh'].shift(24)
-    elec_and_weather['kwh_t-48'] = elec_and_weather['kwh'].shift(48)
+    df['kwh_t-1'] = df['kwh'].shift(1)
+    df['kwh_t-2'] = df['kwh'].shift(2)
+    df['kwh_t-3'] = df['kwh'].shift(3)
+    df['kwh_t-4'] = df['kwh'].shift(4)
+    df['kwh_t-5'] = df['kwh'].shift(5)
+    df['kwh_t-6'] = df['kwh'].shift(6)
+    df['kwh_t-12'] = df['kwh'].shift(12)
+    df['kwh_t-24'] = df['kwh'].shift(24)
+    df['kwh_t-48'] = df['kwh'].shift(48)
 
 
 def split(elec_and_weather, time_str, drop_col=[]):
@@ -123,61 +124,75 @@ def predict_one_day(model, scaler, df, date, scale):
     Returns:
         pred: prediction Array.
     """
+    df_copy = copy.deepcopy(df)
     if scale == 'H':
         # 'block' the historical value so the model can't not see it
         # the first hour prediction uses the true historical data
         # this will actually overwrite the original data frame
-        df.ix[date + ' 01:00:00':date + ' 23:00:00', 'kwh_t-1'] = np.nan
+        df_copy.ix[date + ' 01:00:00':date + ' 23:00:00', 'kwh_t-1'] = np.nan
         pred = np.zeros(24)  # store prediction values
         for i in range(24):
-            if np.isnan(df.ix[date + ' %s:00:00' % i, 'kwh_t-1']):
+            if np.isnan(df_copy.ix[date + ' %s:00:00' % i, 'kwh_t-1']):
                 # use prediction value, must be scale
                 # scaler.mean_[2] because this is the mean for kwh_t-1 column
                 # when you add features, make sure you add historical data
                 # first
-                df.ix[date + ' %s:00:00' % i, 'kwh_t-1'] = (
+                df_copy.ix[date + ' %s:00:00' % i, 'kwh_t-1'] = (
                     pred[i - 1] - scaler.mean_[2]
                 ) / scaler.scale_[2]
             pred[i] = model.predict(  # reshape(1, -1) if predict one example
-                df.ix[date + ' %s:00:00' % i].values.reshape(1, -1))
+                df_copy.ix[date + ' %s:00:00' % i].values.reshape(1, -1))
 
     if scale == '30min':
-        df.ix[date + ' 00:30:00':date + ' 23:30:00', 'kwh_t-1'] = np.nan
+        df_copy.ix[date + ' 00:30:00':date + ' 23:30:00', 'kwh_t-1'] = np.nan
         pred = np.zeros(48)
         for hour in range(24):
             for j in range(2):
                 minute = j * 30
-                if np.isnan(df.ix[date + ' %s:%s:00' % (hour, minute), 'kwh_t-1']):
-                    df.ix[date + ' %s:%s:00' % (hour, minute), 'kwh_t-1'] = (
+                if np.isnan(df_copy.ix[date + ' %s:%s:00' % (hour, minute), 'kwh_t-1']):
+                    df_copy.ix[date + ' %s:%s:00' % (hour, minute), 'kwh_t-1'] = (
                         pred[hour * 2 + j - 1] - scaler.mean_[2]
                     ) / scaler.scale_[2]
                 pred[hour * 2 + j] = model.predict(
-                    df.ix[date + ' %s:%s:00' % (hour, minute)].values.reshape(1, -1))
+                    df_copy.ix[date + ' %s:%s:00' % (hour, minute)].values.reshape(1, -1))
 
     if scale == '4H':
         # in this case I didn't choose kwh_t-1 but kwh_t-6
-        df.ix[date + ' 04:00:00':date + ' 20:00:00', 'kwh_t-6'] = np.nan
+        df_copy.ix[date + ' 04:00:00':date + ' 20:00:00', 'kwh_t-6'] = np.nan
         pred = np.zeros(6)
         for i in range(6):
             hour = i * 4
-            if np.isnan(df.ix[date + ' %s:00:00' % hour, 'kwh_t-6']):
-                df.ix[date + ' %s:00:00' % hour, 'kwh_t-6'] = (
+            if np.isnan(df_copy.ix[date + ' %s:00:00' % hour, 'kwh_t-6']):
+                df_copy.ix[date + ' %s:00:00' % hour, 'kwh_t-6'] = (
                     pred[i - 1] - scaler.mean_[2]
                 ) / scaler.scale_[2]
             pred[i] = model.predict(
-                df.ix[date + ' %s:00:00' % hour].values.reshape(1, -1))
+                df_copy.ix[date + ' %s:00:00' % hour].values.reshape(1, -1))
 
     if scale == '2H':
-        df.ix[date + ' 02:00:00':date + ' 22:00:00', 'kwh_t-12'] = np.nan
+        df_copy.ix[date + ' 02:00:00':date + ' 22:00:00', 'kwh_t-12'] = np.nan
         pred = np.zeros(12)
         for i in range(12):
             hour = i * 2
-            if np.isnan(df.ix[date + ' %s:00:00' % hour, 'kwh_t-12']):
-                df.ix[date + ' %s:00:00' % hour, 'kwh_t-12'] = (
+            if np.isnan(df_copy.ix[date + ' %s:00:00' % hour, 'kwh_t-12']):
+                df_copy.ix[date + ' %s:00:00' % hour, 'kwh_t-12'] = (
                     pred[i - 1] - scaler.mean_[2]
                 ) / scaler.scale_[2]
             pred[i] = model.predict(
-                df.ix[date + ' %s:00:00' % hour].values.reshape(1, -1))
+                df_copy.ix[date + ' %s:00:00' % hour].values.reshape(1, -1))
+
+    if scale == '15min':
+        df_copy.ix[date + ' 00:15:00':date + ' 23:45:00', 'kwh_t-1'] = np.nan
+        pred = np.zeros(96)
+        for hour in range(24):
+            for j in range(4):
+                minute = j * 15
+                if np.isnan(df_copy.ix[date + ' %s:%s:00' % (hour, minute), 'kwh_t-1']):
+                    df_copy.ix[date + ' %s:%s:00' % (hour, minute), 'kwh_t-1'] = (
+                        pred[hour * 2 + j - 1] - scaler.mean_[2]
+                    ) / scaler.scale_[2]
+                pred[hour * 4 + j] = model.predict(
+                    df_copy.ix[date + ' %s:%s:00' % (hour, minute)].values.reshape(1, -1))
 
     return pred
 
@@ -207,7 +222,12 @@ def predict_many_days(model, scaler, df_X_test_scaled, y_test, days, scale):
         result[day] = pred
         err.append(my_errors.errors(y_test[day], pred))
     df_err = pd.DataFrame(err, index=days)
-    return result, df_err
+    df = pd.DataFrame({'Obs': y_test.resample('D').sum(),
+                       'Pred': result.resample('D').sum()})
+    df['err%'] = (df['Pred'] - df['Obs']) / df['Obs'] * 100
+    df = pd.merge(df_err, df, left_index=True, right_index=True)
+
+    return result, df
 
 
 def choose_kernel(X_train, y_train, X_test, y_test,
@@ -270,7 +290,8 @@ def grid_search(parameters, X_train, y_train, X_test, y_test,
         X_train, y_train: training set, scaled DataFrame / Series
         X_test, y_test: test set, scaled DataFrame / Series
         scaler: scaler used to scale data
-        predict_date: str like '4/16/2017', to test the performance.
+        predict_date: list of date str corresponding to X_test,
+                      like ['4/16/2017', '4/17/2017']
 
     Returns:
         search_result: a list of 3 pivoted DataFrames.
@@ -284,9 +305,9 @@ def grid_search(parameters, X_train, y_train, X_test, y_test,
             for c in parameters['C']:
                 model = svm.SVR('linear', C=c).fit(
                     X_train, y_train)
-                pred = predict_one_day(
-                    model, scaler, X_test, predict_date, scale)
-                err.append(my_errors.errors(y_test[predict_date], pred))
+                result, df_err = predict_many_days(
+                    model, scaler, X_test, y_test, predict_date, scale)
+                err.append(df_err.mean())
             df = pd.DataFrame(err, index=parameters['C'], columns=[
                 'MAE', 'MAPE', 'RMSE'])
             df.index.names = ['C']
@@ -298,9 +319,9 @@ def grid_search(parameters, X_train, y_train, X_test, y_test,
                 for g in parameters['gamma']:
                     model = svm.SVR('rbf', C=c, gamma=g).fit(
                         X_train, y_train)
-                    pred = predict_one_day(
-                        model, scaler, X_test, predict_date, scale)
-                    err.append(my_errors.errors(y_test[predict_date], pred))
+                    result, df_err = predict_many_days(
+                        model, scaler, X_test, y_test, predict_date, scale)
+                    err.append(df_err.mean())
             # for the purpose of MultiIndex
             cs = [i for i in parameters['C']
                   for b in range(len(parameters['gamma']))]
@@ -316,9 +337,9 @@ def grid_search(parameters, X_train, y_train, X_test, y_test,
                 for d in parameters['degree']:
                     model = svm.SVR('poly', C=c, degree=d).fit(
                         X_train, y_train)
-                    pred = predict_one_day(
-                        model, scaler, X_test, predict_date, scale)
-                    err.append(my_errors.errors(y_test[predict_date], pred))
+                    result, df_err = predict_many_days(
+                        model, scaler, X_test, y_test, predict_date, scale)
+                    err.append(df_err.mean())
             # for the purpose of MultiIndex
             cs = [i for i in parameters['C']
                   for b in range(len(parameters['degree']))]
@@ -334,3 +355,4 @@ def grid_search(parameters, X_train, y_train, X_test, y_test,
         search_result.update({k: pivoted})
     print('Done.')
     return search_result
+

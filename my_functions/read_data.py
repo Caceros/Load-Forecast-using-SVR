@@ -25,7 +25,7 @@ def weather(path):
     return weather
 
 
-def elec(path, scale):
+def elec(path, scale=None):
     """Read 15min electric consumption data and aggregate by scale.
 
     Args:
@@ -37,12 +37,13 @@ def elec(path, scale):
     """
     df = pd.read_excel(
         path, parse_cols='B, D, F:H, J, L, M, O').set_index('stat_time')
-    df = df.resample(scale).sum()
+    if scale:
+        df = df.resample(scale).sum()
     return df
 
 
 def merge_elec_and_weather(df_elec, df_weather, startDate,
-                           endDate, outer=False):
+                           endDate):
     """
     Merge elec and weather data frame.
     Weather data is in hour interval, but elec data may not be.
@@ -70,7 +71,7 @@ def merge_elec_and_weather(df_elec, df_weather, startDate,
     #         df_elec, df_weather, left_index=True, right_index=True)
     big_data = pd.merge(df_elec, df_weather, left_index=True,
                         right_index=True, how='left')
-    big_data = big_data.fillna(method='ffill')
+    #big_data = big_data.fillna(method='ffill')
     return big_data
 
 
